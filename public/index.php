@@ -24,6 +24,4 @@ require __DIR__ . '/../src/dependencies.php';
 // Register routes
 require __DIR__ . '/../src/routes.php';
 
-
-
 $app->run();
