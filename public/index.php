@@ -16,7 +16,8 @@ $settings = require __DIR__ . '/../src/settings.php';
 $app = new \Slim\App($settings);
 
 // Register services
-require __DIR__ . '/../src/services/player.php';
+require_once __DIR__ . '/../src/services/player.php';
+require_once __DIR__ . '/../src/services/item.php';
 
 // Set up dependencies
 require __DIR__ . '/../src/dependencies.php';

@@ -3,15 +3,16 @@
 
 $app->get('/', function ($request, $response, $args) {
     $id = $request->getParam('displayId');
+    $version = $request->getParam('version');
 
     $this->logger->info("getting player service with ".$id);
     $player = $this->get('player');
 
     // Render index view
-    $data = $player->getPlayer();
-    var_dump($data);
+    //$data = $player->getPlayer();
+    //var_dump($data);
 
     // Echo display owner
-    $ownerId = $player->getDisplayOwner($id);
-    echo "<br><br>OwnerId is ".$ownerId;
+    $schedule = $player->getSchedule($id, $version);
+    echo "<br><br>Schedule: <br> ".$schedule;
 });
