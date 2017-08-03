@@ -18,9 +18,9 @@ return [
 
         'db' => [
             'host' => 'localhost',
-            'dbname' => 'test',
-            'user' => 'root',
-            'pass' => '',
+            'dbname' => 'shine2_dev',
+            'user' => 'shine_dev',
+            'pass' => '1Gr8Test',
         ],
     ],
 ];
