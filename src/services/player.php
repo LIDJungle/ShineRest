@@ -4,6 +4,7 @@ class Player {
     protected $ownerId;
     protected $dayparts;
     protected $allocations;
+    protected $subcompanies;
 
     /**
      * Get our container and all of our stuff...
@@ -29,6 +30,7 @@ class Player {
         $this->ownerId = $this->getDisplayOwner($displayId);
         $this->dayparts = $this->getDayparts();
         $this->allocations = $this->getAllocations($this->ownerId);
+        $this->createSubcompanyArray($this->allocations);
     }
 
     public function getDisplayOwner($displayId) {
@@ -61,4 +63,35 @@ class Player {
         $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
         return $rows[0];
     }
+
+    private function createSubcompanyArray($allocations) {
+        // Get owner allocation
+        $this->subcompanies[] = array(
+            'coid' => $allocations['coid'],
+            'alloc' => round($allocations['owner'] * 2),
+            'name' => 'Owner'
+        );
+        //Get each tenant allocation
+        foreach($allocations['json'] as $subco) {
+            $this->subcompanies[] = array(
+                'coid' => $subco->account,
+                'alloc' => round($subco->allocation * 2),
+                'name' => 'Tenant'
+            );
+        }
+    }
+
+    private function generatePresentationCache ($playlists, $log) {
+        $presentations = array();
+        // TODO: Need to handle empty subcos more gracefully.
+        // Getting errors in the PHP log.
+        foreach ($playlists as $playlist) {
+            foreach ($playlist['presentations'] as $presentation) {
+                $presentations[$presentation['id']] = $presentation;
+            }
+        }
+        return $presentations;
+    }
+
+
 }
