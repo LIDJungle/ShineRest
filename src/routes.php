@@ -1,18 +1,31 @@
 <?php
 // Routes
 
-$app->get('/', function ($request, $response, $args) {
+$app->get('/heartbeat', function ($request, $response, $args) {
     $id = $request->getParam('displayId');
     $version = $request->getParam('version');
-
-    $this->logger->info("getting player service with ".$id);
     $player = $this->get('player');
 
-    // Render index view
-    //$data = $player->getPlayer();
-    //var_dump($data);
-
-    // Echo display owner
     $schedule = $player->getSchedule($id, $version);
-    echo "<br><br>Schedule: <br> ".$schedule;
+    $newResponse = $response->withJson($schedule, 201);
+    return $newResponse;
+});
+
+$app->get('/displayparam', function ($request, $response, $args) {
+    $id = $request->getParam('displayId');
+    $player = $this->get('player');
+
+    $schedule = $player->getDisplayParam($id);
+    $newResponse = $response->withJson($schedule, 201);
+    return $newResponse;
+});
+
+$app->post('/storepop', function ($request, $response, $args) {
+    $id = $request->getParam('displayId');
+    $data = $request->getParam('pop');
+    $pop = $this->get('pop');
+
+    $schedule = $player->getDisplayParam($id);
+    $newResponse = $response->withJson($schedule, 201);
+    return $newResponse;
 });

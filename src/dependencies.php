@@ -27,3 +27,7 @@ $container['player'] = function ($c) {
     $srv = new Player($c);
     return $srv;
 };
+$container['pop'] = function ($c) {
+    $srv = new POP($c);
+    return $srv;
+};

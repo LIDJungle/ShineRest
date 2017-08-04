@@ -17,6 +17,7 @@ $app = new \Slim\App($settings);
 
 // Register services
 require_once __DIR__ . '/../src/services/player.php';
+require_once __DIR__ . '/../src/services/pop.php';
 require_once __DIR__ . '/../src/services/item.php';
 
 // Set up dependencies

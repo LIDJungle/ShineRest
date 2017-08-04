@@ -15,22 +15,12 @@ class Player {
     }
 
     /*
-     * Test function just to make sure I know what I'm doing.
-     */
-    public function getPlayer() {
-        $sql = $this->c->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
-        $sql->execute(array('100002'));
-        return $sql->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /*
      * Get schedule will get the player schedule for sending to glow
      */
     public function getSchedule($displayId, $version) {
         $this->ownerId = $this->getDisplayOwner($displayId);
         $this->dayparts = $this->getDayparts();
         $this->allocations = $this->getAllocations($this->ownerId);
-        echo print_r($this->allocations, 1)."<br>";
         $this->createSubcompanyArray($this->allocations);
 
 
@@ -64,6 +54,26 @@ class Player {
 
         return json_encode($output);
     }
+
+    public function getDisplayParam($displayId) {
+        $sql = $this->c->db->prepare("SELECT `dim_w`, `dim_h`, `crate`, `ownerId`, `dimming`, `zip`, `station` FROM `display` WHERE id = ?");
+        $sql->execute(array($displayId));
+        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $row) {
+            $array[] = array(
+                'w' => $row['dim_w'],
+                'h' => $row['dim_h'],
+                'cr' => $row['crate'],
+                'coid' => $row['ownerId'],
+                'dimming' => $row['dimming'],
+                'zip' => $row['zip'],
+                'station' => $row['station']
+            );
+        }
+        return json_encode($array);
+    }
+
 
     private function getDisplayOwner($displayId) {
         $sql = $this->c->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
@@ -104,9 +114,7 @@ class Player {
             'name' => 'Owner'
         );
         //Get each tenant allocation
-        echo print_r($allocations['json'], 1);
         foreach (json_decode($allocations['json']) as $subco) {
-            echo "Coid: ".$subco->account." Alloc: ".$subco->allocation;
             $this->subcompanies[] = array(
                 'coid' => $subco->account,
                 'alloc' => round($subco->allocation * 2),
@@ -117,8 +125,6 @@ class Player {
 
     private function generatePresentationCache ($playlists) {
         $presentations = array();
-        // TODO: Need to handle empty subcos more gracefully.
-        // Getting errors in the PHP log.
         foreach ($playlists as $playlist) {
             foreach ($playlist['presentations'] as $presentation) {
                 $presentations[$presentation['id']] = $presentation;
@@ -194,7 +200,7 @@ class Player {
         }
         return $presentations;
     }
-    
+
     private function getPresentation($item, $coid) {
         $this->c->logger->info('Getting presentation '.$item->id);
         $presentation = [
@@ -218,7 +224,7 @@ class Player {
             WHERE p.origId = ?");
         $sql->execute(array($item->id));
         $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        
+
         if (!$sql->rowCount()) {
             return false;
         } else {
@@ -356,7 +362,6 @@ class Player {
         $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
         if ($sql->rowCount()) {return false;}
         $curr_version = $rows[0]['player_version'];
-        echo "<br>Version: ".$curr_version."<br>";
         if ($curr_version > $version) {
             return true;
         } else {
