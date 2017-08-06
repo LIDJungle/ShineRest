@@ -31,3 +31,7 @@ $container['pop'] = function ($c) {
     $srv = new POP($c);
     return $srv;
 };
+$container['display'] = function ($c) {
+    $srv = new Display($c);
+    return $srv;
+};

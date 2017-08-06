@@ -1,11 +1,17 @@
 <?php
 class POP
 {
+    protected $c;
+    protected $db;
+    protected $log;
+
     /**
      * Get our container and all of our stuff...
      */
     public function __construct(Slim\Container $c) {
         $this->c = $c;
+        $this->db = $c->db;
+        $this->log = $$c->logger;
         return;
     }
 

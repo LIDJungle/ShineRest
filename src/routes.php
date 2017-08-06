@@ -13,10 +13,10 @@ $app->get('/heartbeat', function ($request, $response, $args) {
 
 $app->get('/displayparam', function ($request, $response, $args) {
     $id = $request->getParam('displayId');
-    $player = $this->get('player');
+    $display = $this->get('display');
 
-    $schedule = $player->getDisplayParam($id);
-    $newResponse = $response->withJson($schedule, 201);
+    $params = $display->getDisplayParam($id);
+    $newResponse = $response->withJson($params, 201);
     return $newResponse;
 });
 
@@ -25,7 +25,7 @@ $app->post('/storepop', function ($request, $response, $args) {
     $data = $request->getParam('pop');
     $pop = $this->get('pop');
 
-    $schedule = $player->getDisplayParam($id);
-    $newResponse = $response->withJson($schedule, 201);
+    $stat = $pop->storePop($id, $data);
+    $newResponse = $response->withJson($stat, 201);
     return $newResponse;
 });
