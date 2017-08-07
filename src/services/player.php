@@ -23,7 +23,12 @@ class Player {
     /*
      * Get schedule will get the player schedule for sending to glow
      */
-    public function getSchedule($displayId, $version) {
+    public function getSchedule($displayId, $version, $mode) {
+        if ($mode === 'false') {
+            $this->updateHeartbeat($version, $displayId);
+            $this->resetReboot($displayId);
+            $this->clearOutage($displayId);
+        }
         $this->ownerId = $this->getDisplayOwner($displayId);
         $this->dayparts = $this->getDayparts();
         $this->allocations = $this->getAllocations($this->ownerId);
@@ -227,22 +232,25 @@ class Player {
     }
 
     /*
- * Memo to myself:
- * so this all works by making up an array of the various playlist id's and allocations.
- * that is sent through randomizeArray which sends back a list of 200 playlist Id's,
- *  allocated and shuffled.
- *
- * from there we go into each playlist and choose a presentation id based on the random/repeat, etc...
- * finally we send back a 200 item list of presentation Id's for play.
- *
- * Still need to deal with weighting in here.
- */
+     * Memo to myself:
+     * This all works by making up an array of the various playlist id's and allocations.
+     * that is sent through randomizeArray which sends back a list of 200 playlist Id's,
+     *  allocated and shuffled.
+     *
+     * from there we go into each playlist and choose a presentation id based on the random/repeat, etc...
+     * finally we send back a 200 item list of presentation Id's for play.
+     *
+     * Still need to deal with weighting in here.
+     */
     private function generatePlaylist($playlists) {
         /*
-         * We will have multiple playlists per daypart.
+         * Better document what's going on in here
+         * 
          */
-
-        $s = array(); $pcache = array(); $loops = array();
+        
+        $s = array(); // Unrandomized schedule list and allocation 
+        $pcache = array(); // playlist cache - tracks by presentationId
+        $loops = array(); // for tracking loops by subcompany
 
         foreach ($playlists as $p) {
             //$this->log->info("Working on new playlist.".print_r($p, 1));
@@ -254,7 +262,8 @@ class Player {
         //$this->log->info("Passed presentation cache");
         $scheduleList = $this->randomizeArray($s);
 
-        $sched = array(); $seen = array();
+        $schedule = array(); // Output array
+        $seen = array(); // Track seen presentations for no repeat
 
         foreach ($scheduleList as $item) {
             $this->log->info("Current Playlist ".$item." Count: ".$loops[$item]);
@@ -284,16 +293,16 @@ class Player {
                 $this->log->info("Rand is ".$rand);
                 // So, this is the place where we get a presentation id to pass back to the main schedule.
                 $this->log->info("Playing random. Pushing " . $pcache[$item]['presentations'][$rand]['id']);
-                array_push($sched, ['pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']]);
+                array_push($schedule, ['pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']]);
                 $loops[$item]++;
             } else {
                 $this->log->info("Playing in order. Pushing " . $p['presentations'][$loops[$item]]['id']);
-                array_push($sched, ['pid' => $pcache[$item]['presentations'][$loops[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loops[$item]]['coid']]);
+                array_push($schedule, ['pid' => $pcache[$item]['presentations'][$loops[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loops[$item]]['coid']]);
                 $loops[$item]++;
             }
         };
-        //$this->log->info('$sched returns '.print_r($sched, 1));
-        return $sched;
+        //$this->log->info('$schedule returns '.print_r($schedule, 1));
+        return $schedule;
     }
 
     private function generateMasterPlaylist($playlists) {

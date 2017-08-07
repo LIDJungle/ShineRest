@@ -4,9 +4,10 @@
 $app->get('/heartbeat', function ($request, $response, $args) {
     $id = $request->getParam('displayId');
     $version = $request->getParam('version');
+    $mode = $request->getParam('previewMode');
     $player = $this->get('player');
 
-    $schedule = $player->getSchedule($id, $version);
+    $schedule = $player->getSchedule($id, $version, $mode);
     $newResponse = $response->withJson($schedule, 201);
     return $newResponse;
 });
