@@ -30,7 +30,7 @@ class Display {
             $data['coid'] = $data['ownerId'];
             $data['status'] = 'success';
         } catch (PDOException $ex){
-            $data['status'] = 'error';
+            $data['stat'] = 'error';
             $data['message'] = $ex->getMessage();
             $this->log->error("Database Error: ".$ex->getMessage());
         }

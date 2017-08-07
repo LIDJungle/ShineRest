@@ -41,7 +41,7 @@ class POP
                     ));
                 } catch (PDOException $ex){
                     $this->log->error("Database Error: ".$ex->getMessage());
-                    return 'error';
+                    return array('stat' => 'error', 'message' =>  $ex->getMessage());
                 }
             } else {
                 $this->c->logger->info("Duplicate POP entry filtered.\n".print_r($popentry, 1));

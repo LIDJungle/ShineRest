@@ -86,7 +86,7 @@ class Player {
             return $rows[0]['ownerId'];
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -116,7 +116,7 @@ class Player {
             return $rows[0];
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -178,7 +178,7 @@ class Player {
             return $playlist;
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -222,7 +222,7 @@ class Player {
             return $presentations;
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
     }
 
@@ -265,7 +265,7 @@ class Player {
             }
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
     }
 
@@ -356,7 +356,7 @@ class Player {
             }
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -367,7 +367,7 @@ class Player {
             $sql->execute(array($version, $display));
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -380,7 +380,7 @@ class Player {
                 $sql->execute(array($display));
             } catch (PDOException $ex){
                 $this->log->error("Database Error: ".$ex->getMessage());
-                return 'error';
+                return array('stat' => 'error', 'message' =>  $ex->getMessage());
             }
         }
     }
@@ -401,7 +401,7 @@ class Player {
             }
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
@@ -419,7 +419,7 @@ class Player {
             }
         } catch (PDOException $ex){
             $this->log->error("Database Error: ".$ex->getMessage());
-            return 'error';
+            return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }

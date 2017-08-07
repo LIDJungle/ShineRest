@@ -9,7 +9,12 @@ $app->get('/heartbeat', function ($request, $response, $args) {
     $player = $this->get('player');
 
     $schedule = $player->getSchedule($id, $version, $mode, $reboot);
-    $newResponse = $response->withJson($schedule, 200);
+    if ($schedule['stat'] === 'error') {
+        $newResponse = $response->withJson($schedule, 300);
+    } else {
+        $newResponse = $response->withJson($schedule, 200);
+    }
+
     return $newResponse;
 });
 
@@ -18,7 +23,11 @@ $app->get('/displayparam', function ($request, $response, $args) {
     $display = $this->get('display');
 
     $params = $display->getDisplayParam($id);
-    $newResponse = $response->withJson($params, 200);
+    if ($params['stat'] === 'error') {
+        $newResponse = $response->withJson($params, 300);
+    } else {
+        $newResponse = $response->withJson($params, 200);
+    }
     return $newResponse;
 });
 
@@ -28,6 +37,10 @@ $app->post('/storepop', function ($request, $response, $args) {
     $pop = $this->get('pop');
 
     $stat = $pop->storePop($id, $data);
-    $newResponse = $response->withJson($stat, 200);
+    if ($stat['stat'] === 'error') {
+        $newResponse = $response->withJson($stat, 300);
+    } else {
+        $newResponse = $response->withJson($stat, 200);
+    }
     return $newResponse;
 });
