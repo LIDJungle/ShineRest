@@ -16,25 +16,24 @@ class Display {
 
     /*
      * Returns player params from database.
-     * TODO: Update ajax calls in player and app to use the database defined array for easier pass through.
      *
      */
-    protected  $data;
     public function getDisplayParam($displayId) {
         try {
             $sql = $this->db->prepare("SELECT * FROM `display` WHERE id = ?");
             $sql->execute(array($displayId));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-            $this->data = $rows[0];
-            $this->data['w'] = $this->data['dim_w'];
-            $this->data['h'] = $this->data['dim_h'];
-            $this->data['cr'] = $this->data['crate'];
-            $this->data['coid'] = $this->data['ownerId'];
-            $this->data['status'] = 'success';
+            $data = $rows[0];
+            $data['w'] = $data['dim_w'];
+            $data['h'] = $data['dim_h'];
+            $data['cr'] = $data['crate'];
+            $data['coid'] = $data['ownerId'];
+            $data['status'] = 'success';
         } catch (PDOException $ex){
-            $this->data['status'] = 'error';
-            $this->data['message'] = $ex->getMessage();
+            $data['status'] = 'error';
+            $data['message'] = $ex->getMessage();
+            $this->log->error("Database Error: ".$ex->getMessage());
         }
-        return json_encode($this->data);
+        return json_encode($data);
     }
 }

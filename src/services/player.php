@@ -11,7 +11,7 @@ class Player {
     public function __construct(Slim\Container $c) {
         $this->c = $c;
         $this->db = $c->db;
-        $this->log = $$c->logger;
+        $this->log = $c->logger;
         return;
     }
 
@@ -23,10 +23,10 @@ class Player {
     /*
      * Get schedule will get the player schedule for sending to glow
      */
-    public function getSchedule($displayId, $version, $mode) {
+    public function getSchedule($displayId, $version, $mode, $reboot) {
         if ($mode === 'false') {
             $this->updateHeartbeat($version, $displayId);
-            $this->resetReboot($displayId);
+            $this->resetReboot($reboot, $displayId);
             $this->clearOutage($displayId);
         }
         $this->ownerId = $this->getDisplayOwner($displayId);
@@ -34,6 +34,9 @@ class Player {
         $this->allocations = $this->getAllocations($this->ownerId);
         $this->createSubcompanyArray($this->allocations);
 
+        /*
+         *  Step 1: Create subcompany array needs to return the allocation for multi-display.
+         */
 
         $output = array(
             'schedule' => [],
@@ -54,10 +57,18 @@ class Player {
                 'stop' => $d['stop'],
                 'lastMod' => $d['lastMod']
             ];
+
+            /*
+             *  Step 2: get playlist has to understand multi display
+             */
             foreach ($this->subcompanies as $s) {
                 $playlists[] = $this->getPlaylist($d, $s);
             }
-            $daypart['masterPlaylist'] = $this->generateMasterPlaylist($playlists);
+
+            /*
+             *  Step 3: generate master playlist has to be able to handle it.
+             */
+            $daypart['masterPlaylist'] = $this->generatePlaylist($playlists);
             $this->log->info("Master Playlist\n".print_r($daypart['masterPlaylist'], 1));
             $daypart['presentations'] = $this->generatePresentationCache($playlists);
             $output['schedule'][] = $daypart;
@@ -68,14 +79,20 @@ class Player {
 
 
     private function getDisplayOwner($displayId) {
-        $sql = $this->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
-        $sql->execute(array($displayId));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        return $rows[0]['ownerId'];
+        try {
+            $sql = $this->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
+            $sql->execute(array($displayId));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            return $rows[0]['ownerId'];
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
+        }
+
     }
 
     /*
-     * Dayparts have been depricated, so we just return an "all day, all week" dummy.
+     * Dayparts have been deprecated, so we just return an "all day, all week" dummy.
      */
     private function getDayparts() {
         $dayparts[] = array(
@@ -92,10 +109,16 @@ class Player {
 
     // TODO: This should be by display ID not company ID. Support multiple displays per company.
     private function getAllocations($ownerId) {
-        $sql = $this->db->prepare("SELECT * FROM `allocations` WHERE `coid`= ?");
-        $sql->execute(array($ownerId));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        return $rows[0];
+        try {
+            $sql = $this->db->prepare("SELECT * FROM `allocations` WHERE `coid`= ?");
+            $sql->execute(array($ownerId));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            return $rows[0];
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
+        }
+
     }
 
     private function createSubcompanyArray($allocations) {
@@ -133,26 +156,31 @@ class Player {
             'random' => true,
             'repeat' => true
         ];
+        try {
+            $sql = $this->db->prepare("SELECT `id`, `name`, `items`, `random`, `repeat` FROM `playlists` WHERE `coid`= ? AND `daypartId` LIKE ?");
+            $sql->execute(array($subco['coid'], $daypart['id']));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
 
-        $sql = $this->db->prepare("SELECT `id`, `name`, `items`, `random`, `repeat` FROM `playlists` WHERE `coid`= ? AND `daypartId` LIKE ?");
-        $sql->execute(array($subco['coid'], $daypart['id']));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            // No assigned playlist
+            if (!$sql->rowCount()) {
+                $this->log->info("No rows returned from DB in getPlaylist. Returning default presentation for: ".$subco['coid'].".");
+                $playlist['id'] = $subco['coid'];
+                $playlist['random'] = '0';
+                $playlist['repeat'] = '0';
+                $playlist['presentations'] = $this->getDefaultPresentation($subco['coid']);
+                return $playlist;
+            }
 
-        // No assigned playlist
-        if (!$sql->rowCount()) {
-            $this->log->info("No rows returned from DB in getPlaylist. Returning default presentation for: ".$subco['coid'].".");
-            $playlist['id'] = $subco['coid'];
-            $playlist['random'] = '0';
-            $playlist['repeat'] = '0';
-            $playlist['presentations'] = $this->getDefaultPresentation($subco['coid']);
+            $playlist['id'] = $rows[0]['id'];
+            $playlist['random'] = $rows[0]['random'];
+            $playlist['repeat'] = $rows[0]['repeat'];
+            $playlist['presentations'] = $this->getPresentations($rows[0]['items'], $subco['coid']);
             return $playlist;
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
 
-        $playlist['id'] = $rows[0]['id'];
-        $playlist['random'] = $rows[0]['random'];
-        $playlist['repeat'] = $rows[0]['repeat'];
-        $playlist['presentations'] = $this->getPresentations($rows[0]['items'], $subco['coid']);
-        return $playlist;
     }
 
     private function getPresentations($items, $coid) {
@@ -172,25 +200,30 @@ class Player {
 
     private function getDefaultPresentation($coid) {
         $presentations = array();
-        $sql = $this->db->prepare("SELECT `defaultPres` FROM `accounts` WHERE `id`= ?");
-        $sql->execute(array($coid));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        if (!$sql->rowCount()) {
-            $this->log->info("Could not find default presentation for ".$coid);
-        } else {
-            foreach ($rows as $row) {
-                if ($row['defaultPres'] !== '') {
-                    $this->log->info("Returning default presentation: " . $row['defaultPres']);
-                    $i = new Item();
-                    $i->id = $row['defaultPres'];
-                    $p = $this->getPresentation($i, $coid);
-                    if ($p) {
-                        $presentations[] = $p;
+        try {
+            $sql = $this->db->prepare("SELECT `defaultPres` FROM `accounts` WHERE `id`= ?");
+            $sql->execute(array($coid));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            if (!$sql->rowCount()) {
+                $this->log->info("Could not find default presentation for ".$coid);
+            } else {
+                foreach ($rows as $row) {
+                    if ($row['defaultPres'] !== '') {
+                        $this->log->info("Returning default presentation: " . $row['defaultPres']);
+                        $i = new Item();
+                        $i->id = $row['defaultPres'];
+                        $p = $this->getPresentation($i, $coid);
+                        if ($p) {
+                            $presentations[] = $p;
+                        }
                     }
                 }
             }
+            return $presentations;
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
-        return $presentations;
     }
 
     private function getPresentation($item, $coid) {
@@ -205,7 +238,8 @@ class Player {
             'coid' => $coid
         ];
 
-        $sql = $this->db->prepare("SELECT p.json, p.name, p.origId, p.version, p.id, amax.status, p.tags
+        try{
+            $sql = $this->db->prepare("SELECT p.json, p.name, p.origId, p.version, p.id, amax.status, p.tags
             FROM presentations as p
             inner join(
                 SELECT origId, MAX(version) as ver FROM presentations WHERE approval != '0' group by origId
@@ -214,20 +248,24 @@ class Player {
                 SELECT presId, id, MAX(status) as status FROM approval WHERE status != 0 GROUP BY presId
             ) amax on p.origId = amax.presId
             WHERE p.origId = ?");
-        $sql->execute(array($item->id));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            $sql->execute(array($item->id));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!$sql->rowCount()) {
-            return false;
-        } else {
-            foreach ($rows as $row) {
-                if ($row['status'] == NULL) {return false;}
-                $presentation['version'] = $row['version'];
-                $presentation['json'] = $row['json'];
-                $presentation['name'] = $row['name'];
-                $presentation['tags'] = $row['tags'];
+            if (!$sql->rowCount()) {
+                return false;
+            } else {
+                foreach ($rows as $row) {
+                    if ($row['status'] == NULL) {return false;}
+                    $presentation['version'] = $row['version'];
+                    $presentation['json'] = $row['json'];
+                    $presentation['name'] = $row['name'];
+                    $presentation['tags'] = $row['tags'];
+                }
+                return $presentation;
             }
-            return $presentation;
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
     }
 
@@ -245,10 +283,10 @@ class Player {
     private function generatePlaylist($playlists) {
         /*
          * Better document what's going on in here
-         * 
+         *
          */
-        
-        $s = array(); // Unrandomized schedule list and allocation 
+
+        $s = array(); // Unrandomized schedule list and allocation
         $pcache = array(); // playlist cache - tracks by presentationId
         $loops = array(); // for tracking loops by subcompany
 
@@ -305,64 +343,85 @@ class Player {
         return $schedule;
     }
 
-    private function generateMasterPlaylist($playlists) {
-        $sched = array();
-        foreach ($playlists as $p) {
-            $sched = $this->generatePlaylist($playlists);
-        }
-        return $sched;
-    }
-
     private function getReboot($display) {
-        $sql = $this->db->prepare("select `reboot` FROM display WHERE `id` = ?");
-        $sql->execute(array($display));
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        $this->log->info("Reboot status: ".$rows[0]['reboot']);
-        if ($rows[0]['reboot']) {
-            return 'true';
-        } else {
-            return 'false';
+        try {
+            $sql = $this->db->prepare("select `reboot` FROM display WHERE `id` = ?");
+            $sql->execute(array($display));
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            $this->log->info("Reboot status: ".$rows[0]['reboot']);
+            if ($rows[0]['reboot']) {
+                return 'true';
+            } else {
+                return 'false';
+            }
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
+
     }
 
     private function updateHeartbeat($version, $display) {
-        $sql = $this->db->prepare("UPDATE `display` SET `heartbeat`=Now(), `version`= ? WHERE id = ?");
-        $sql->execute(array($version, $display));
+        try {
+            $sql = $this->db->prepare("UPDATE `display` SET `heartbeat`=Now(), `version`= ? WHERE id = ?");
+            $sql->execute(array($version, $display));
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
+        }
+
     }
 
     private function resetReboot($reboot, $display) {
         // If this is the first player run, reset the reboot flag.
         if ($reboot == 'true') {
-            $sql = $this->db->prepare("UPDATE `display` SET `reboot` = 0 WHERE id =  ?");
-            $sql->execute(array($display));
+            try {
+                $sql = $this->db->prepare("UPDATE `display` SET `reboot` = 0 WHERE id =  ?");
+                $sql->execute(array($display));
+            } catch (PDOException $ex){
+                $this->log->error("Database Error: ".$ex->getMessage());
+                return 'error';
+            }
         }
     }
 
     private function clearOutage($display) {
         // Are we coming back from an outage?
-        $sql = $this->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
-        $rows = $sql->execute(array($display));
-
-        if ($sql->rowCount() > 0) {
+        try {
             $sql = $this->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
-            $sql2 = $this->db->prepare("UPDATE `display` SET `outage_id`=0 WHERE id= ?");
-            foreach ($rows as $row) {
-                $sql->execute(array($display));
-                $sql2->execute(array($display));
+            $rows = $sql->execute(array($display));
+
+            if ($sql->rowCount() > 0) {
+                $sql = $this->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
+                $sql2 = $this->db->prepare("UPDATE `display` SET `outage_id`=0 WHERE id= ?");
+                foreach ($rows as $row) {
+                    $sql->execute(array($display));
+                    $sql2->execute(array($display));
+                }
             }
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
+
     }
 
     private function getUpdate($version) {
-        $sql = $this->db->query("select `player_version` FROM config");
-        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-        if ($sql->rowCount()) {return false;}
-        $curr_version = $rows[0]['player_version'];
-        if ($curr_version > $version) {
-            return true;
-        } else {
-            return false;
+        try {
+            $sql = $this->db->query("select `player_version` FROM config");
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            if ($sql->rowCount()) {return false;}
+            $curr_version = $rows[0]['player_version'];
+            if ($curr_version > $version) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (PDOException $ex){
+            $this->log->error("Database Error: ".$ex->getMessage());
+            return 'error';
         }
+
     }
 
     private function randomizeArray ($data) {
