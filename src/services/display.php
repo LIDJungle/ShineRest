@@ -28,12 +28,12 @@ class Display {
             $data['h'] = $data['dim_h'];
             $data['cr'] = $data['crate'];
             $data['coid'] = $data['ownerId'];
-            $data['status'] = 'success';
+            $data['stat'] = 'success';
         } catch (PDOException $ex){
             $data['stat'] = 'error';
             $data['message'] = $ex->getMessage();
             $this->log->error("Database Error: ".$ex->getMessage());
         }
-        return json_encode($data);
+        return $data;
     }
 }

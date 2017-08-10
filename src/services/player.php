@@ -74,7 +74,7 @@ class Player {
             $output['schedule'][] = $daypart;
         }
 
-        return json_encode($output);
+        return $output;
     }
 
 
@@ -283,13 +283,22 @@ class Player {
     private function generatePlaylist($playlists) {
         /*
          * Better document what's going on in here
+         *  So, it seems to me like I could get more mileage out of making this an array of objects.
+         *
+         *
+         *
          *
          */
 
-        $s = array(); // Unrandomized schedule list and allocation
-        $pcache = array(); // playlist cache - tracks by presentationId
-        $loops = array(); // for tracking loops by subcompany
+        $s = array(); // Unrandomized schedule list (playlist id,  allocation)
+        $pcache = array(); // playlist cache - tracks by [playlistId][presentationId]
+        $loops = array(); // for tracking loops by playlistId
 
+        /*
+         * Here we set up the array of playlists and allocations for our randomizer.
+         * we also set up a cache of playlists and store each one's length.
+         * Finally, we set up the number of times we've looped over each playlist.
+         */
         foreach ($playlists as $p) {
             //$this->log->info("Working on new playlist.".print_r($p, 1));
             $s[] = array($p['id'], $p['alloc']);
@@ -298,25 +307,36 @@ class Player {
             $loops[$p['id']] = 0;
         }
         //$this->log->info("Passed presentation cache");
+
+        /*
+         * Our final schedule list comes back randomized.
+         * It's an array of playlist Id's and allocations.
+         */
         $scheduleList = $this->randomizeArray($s);
 
         $schedule = array(); // Output array
         $seen = array(); // Track seen presentations for no repeat
 
+        /*
+         * Here's where we choose the next presentation in line.
+         */
+
         foreach ($scheduleList as $item) {
             $this->log->info("Current Playlist ".$item." Count: ".$loops[$item]);
             // No presentations? Skip 'em.
             if ($pcache[$item]['count'] == 0) {continue;}
+
             // Have we looped as many times as we have presentations? Reset the loop.
             if ($loops[$item] == $pcache[$item]['count']) {$loops[$item] = 0;}
 
+            // Here's where we randomize the order in which we play the playlist
             if ($pcache[$item]['random']) {
-                $this->log->info("Randomizing play order");
+                //$this->log->info("Randomizing play order");
                 // Choose a number between 0 and the total number of presentations
                 $rand = rand(0, ($pcache[$item]['count'] - 1));
 
                 if ($pcache[$item]['repeat']) {
-                    $this->log->info("With no repeats.");
+                    //$this->log->info("With no repeats.");
                     if (!in_array($seen[$item], $seen)) {$seen[$item] = array();}
                     if (count($seen[$item]) == $pcache[$item]['count']) {
                         $seen[$item] = array(); // we've already seen all of the presentations
@@ -328,12 +348,13 @@ class Player {
                     array_push($seen[$item], $rand);
                 }
 
-                $this->log->info("Rand is ".$rand);
+                //$this->log->info("Rand is ".$rand);
                 // So, this is the place where we get a presentation id to pass back to the main schedule.
                 $this->log->info("Playing random. Pushing " . $pcache[$item]['presentations'][$rand]['id']);
                 array_push($schedule, ['pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']]);
                 $loops[$item]++;
             } else {
+                // Or we do it here if were just playing in order.
                 $this->log->info("Playing in order. Pushing " . $p['presentations'][$loops[$item]]['id']);
                 array_push($schedule, ['pid' => $pcache[$item]['presentations'][$loops[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loops[$item]]['coid']]);
                 $loops[$item]++;
