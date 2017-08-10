@@ -19,6 +19,7 @@ $app->get('/getSchedule', function ($request, $response, $args) {
         $r['message'] = "DisplayId was not specified. Cannot return schedule.";
         return $response->withJson($r, 400);
     }
+    //$this->logger->info("DisplayId is ".$id." Version is ".$version." Mode is ".$mode." reboot is ".$reboot);
 
     $player = $this->get('player');
 
@@ -38,13 +39,12 @@ $app->get('/getSchedule', function ($request, $response, $args) {
  * Required: displayId
  */
 $app->get('/getDisplay', function ($request, $response, $args) {
-    $id = $request->getParam('displayId');
+    $id = $request->getParam('id');
     if ($id === null) {
         $r['stat'] = 'error';
         $r['message'] = "DisplayId was not specified. Cannot return display parameters.";
         return $response->withJson($r, 400);
     }
-
     $display = $this->get('display');
 
     $params = $display->getDisplayParam($id);
@@ -53,6 +53,7 @@ $app->get('/getDisplay', function ($request, $response, $args) {
     } else {
         $newResponse = $response->withJson($params, 200);
     }
+
     return $newResponse;
 });
 
@@ -88,6 +89,25 @@ $app->post('/storePop', function ($request, $response, $args) {
     return $newResponse;
 });
 
+$app->get('/loadPresentation', function ($request, $response, $args) {
+    $id = $request->getParam('id');
+    if ($id === null) {
+        $r['stat'] = 'error';
+        $r['message'] = "PresentationId was not specified. Cannot get presentation.";
+        return $response->withJson($r, 400);
+    }
+
+    $presentation = $this->get('presentation');
+    $data = $presentation->load($id);
+    if ($data['stat'] === 'error') {
+        $newResponse = $response->withJson($data, 500);
+    } else {
+        $newResponse = $response->withJson($data, 200);
+    }
+    return $newResponse;
+});
+
+// Respond to network check
 $app->any('/ping', function ($request, $response, $args) {
     return $response;
 });

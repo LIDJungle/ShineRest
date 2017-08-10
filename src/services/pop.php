@@ -2,16 +2,12 @@
 class POP
 {
     protected $c;
-    protected $db;
-    protected $log;
 
     /**
      * Get our container and all of our stuff...
      */
     public function __construct(Slim\Container $c) {
         $this->c = $c;
-        $this->db = $c->db;
-        $this->log = $$c->logger;
         return;
     }
 
@@ -22,7 +18,7 @@ class POP
                 $sql = $this->c->db->prepare("SELECT * FROM `pop` WHERE `displayId` = ? AND `time` = ?");
                 $sql->execute(array($displayId, $time));
             } catch (PDOException $ex){
-                $this->log->error("Database Error: ".$ex->getMessage());
+                $this->c->logger->error("Database Error: ".$ex->getMessage());
                 return 'error';
             }
 
@@ -40,7 +36,7 @@ class POP
                         ':coid' => $popentry['coid']
                     ));
                 } catch (PDOException $ex){
-                    $this->log->error("Database Error: ".$ex->getMessage());
+                    $this->c->logger->error("Database Error: ".$ex->getMessage());
                     return array('stat' => 'error', 'message' =>  $ex->getMessage());
                 }
             } else {

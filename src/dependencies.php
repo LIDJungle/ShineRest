@@ -35,3 +35,7 @@ $container['display'] = function ($c) {
     $srv = new Display($c);
     return $srv;
 };
+$container['presentation'] = function ($c) {
+    $srv = new Presentation($c);
+    return $srv;
+};

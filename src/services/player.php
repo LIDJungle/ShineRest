@@ -2,16 +2,12 @@
 class Player {
     /**
      * Get container object and dependencies.
-     * $this->db: PDO object
-     * $this->log: Monolog object
+     * $this->c->db: PDO object
+     * $this->c->logger: Monolog object
      */
     protected $c;
-    protected $db;
-    protected $log;
     public function __construct(Slim\Container $c) {
         $this->c = $c;
-        $this->db = $c->db;
-        $this->log = $c->logger;
         return;
     }
 
@@ -24,6 +20,7 @@ class Player {
      * Get schedule will get the player schedule for sending to glow
      */
     public function getSchedule($displayId, $version, $mode, $reboot) {
+        //$this->c->logger->info("DisplayId is ".$displayId." Version is ".$version." Mode is ".$mode." reboot is ".$reboot);
         if ($mode === 'false') {
             $this->updateHeartbeat($version, $displayId);
             $this->resetReboot($reboot, $displayId);
@@ -69,7 +66,7 @@ class Player {
              *  Step 3: generate master playlist has to be able to handle it.
              */
             $daypart['masterPlaylist'] = $this->generatePlaylist($playlists);
-            $this->log->info("Master Playlist\n".print_r($daypart['masterPlaylist'], 1));
+            $this->c->logger->info("Master Playlist\n".print_r($daypart['masterPlaylist'], 1));
             $daypart['presentations'] = $this->generatePresentationCache($playlists);
             $output['schedule'][] = $daypart;
         }
@@ -80,12 +77,12 @@ class Player {
 
     private function getDisplayOwner($displayId) {
         try {
-            $sql = $this->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
+            $sql = $this->c->db->prepare("SELECT `ownerId` FROM `display` WHERE id = ?");
             $sql->execute(array($displayId));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
             return $rows[0]['ownerId'];
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -110,12 +107,12 @@ class Player {
     // TODO: This should be by display ID not company ID. Support multiple displays per company.
     private function getAllocations($ownerId) {
         try {
-            $sql = $this->db->prepare("SELECT * FROM `allocations` WHERE `coid`= ?");
+            $sql = $this->c->db->prepare("SELECT * FROM `allocations` WHERE `coid`= ?");
             $sql->execute(array($ownerId));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
             return $rows[0];
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -157,13 +154,13 @@ class Player {
             'repeat' => true
         ];
         try {
-            $sql = $this->db->prepare("SELECT `id`, `name`, `items`, `random`, `repeat` FROM `playlists` WHERE `coid`= ? AND `daypartId` LIKE ?");
+            $sql = $this->c->db->prepare("SELECT `id`, `name`, `items`, `random`, `repeat` FROM `playlists` WHERE `coid`= ? AND `daypartId` LIKE ?");
             $sql->execute(array($subco['coid'], $daypart['id']));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
 
             // No assigned playlist
             if (!$sql->rowCount()) {
-                $this->log->info("No rows returned from DB in getPlaylist. Returning default presentation for: ".$subco['coid'].".");
+                $this->c->logger->info("No rows returned from DB in getPlaylist. Returning default presentation for: ".$subco['coid'].".");
                 $playlist['id'] = $subco['coid'];
                 $playlist['random'] = '0';
                 $playlist['repeat'] = '0';
@@ -177,7 +174,7 @@ class Player {
             $playlist['presentations'] = $this->getPresentations($rows[0]['items'], $subco['coid']);
             return $playlist;
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -192,7 +189,7 @@ class Player {
             if ($p) {$presentations[] = $p;}
         }
         if (count($presentations) == 0) {
-            $this->log->info("No valid presentations found. Getting default presentation for ".$coid);
+            $this->c->logger->info("No valid presentations found. Getting default presentation for ".$coid);
             $presentations = $this->getDefaultPresentation($coid);
         }
         return $presentations;
@@ -201,15 +198,15 @@ class Player {
     private function getDefaultPresentation($coid) {
         $presentations = array();
         try {
-            $sql = $this->db->prepare("SELECT `defaultPres` FROM `accounts` WHERE `id`= ?");
+            $sql = $this->c->db->prepare("SELECT `defaultPres` FROM `accounts` WHERE `id`= ?");
             $sql->execute(array($coid));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
             if (!$sql->rowCount()) {
-                $this->log->info("Could not find default presentation for ".$coid);
+                $this->c->logger->info("Could not find default presentation for ".$coid);
             } else {
                 foreach ($rows as $row) {
                     if ($row['defaultPres'] !== '') {
-                        $this->log->info("Returning default presentation: " . $row['defaultPres']);
+                        $this->c->logger->info("Returning default presentation: " . $row['defaultPres']);
                         $i = new Item();
                         $i->id = $row['defaultPres'];
                         $p = $this->getPresentation($i, $coid);
@@ -221,13 +218,13 @@ class Player {
             }
             return $presentations;
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
     }
 
     private function getPresentation($item, $coid) {
-        $this->log->info('Getting presentation '.$item->id);
+        $this->c->logger->info('Getting presentation '.$item->id);
         $presentation = [
             'id' => $item->id,
             'json' => [],
@@ -239,7 +236,7 @@ class Player {
         ];
 
         try{
-            $sql = $this->db->prepare("SELECT p.json, p.name, p.origId, p.version, p.id, amax.status, p.tags
+            $sql = $this->c->db->prepare("SELECT p.json, p.name, p.origId, p.version, p.id, amax.status, p.tags
             FROM presentations as p
             inner join(
                 SELECT origId, MAX(version) as ver FROM presentations WHERE approval != '0' group by origId
@@ -264,7 +261,7 @@ class Player {
                 return $presentation;
             }
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
     }
@@ -300,13 +297,13 @@ class Player {
          * Finally, we set up the number of times we've looped over each playlist.
          */
         foreach ($playlists as $p) {
-            //$this->log->info("Working on new playlist.".print_r($p, 1));
+            //$this->c->logger->info("Working on new playlist.".print_r($p, 1));
             $s[] = array($p['id'], $p['alloc']);
             $pcache[$p['id']] = $p;
             $pcache[$p['id']]['count'] = count($p['presentations']);
             $loops[$p['id']] = 0;
         }
-        //$this->log->info("Passed presentation cache");
+        //$this->c->logger->info("Passed presentation cache");
 
         /*
          * Our final schedule list comes back randomized.
@@ -322,7 +319,7 @@ class Player {
          */
 
         foreach ($scheduleList as $item) {
-            $this->log->info("Current Playlist ".$item." Count: ".$loops[$item]);
+            $this->c->logger->info("Current Playlist ".$item." Count: ".$loops[$item]);
             // No presentations? Skip 'em.
             if ($pcache[$item]['count'] == 0) {continue;}
 
@@ -331,52 +328,52 @@ class Player {
 
             // Here's where we randomize the order in which we play the playlist
             if ($pcache[$item]['random']) {
-                //$this->log->info("Randomizing play order");
+                //$this->c->logger->info("Randomizing play order");
                 // Choose a number between 0 and the total number of presentations
                 $rand = rand(0, ($pcache[$item]['count'] - 1));
 
                 if ($pcache[$item]['repeat']) {
-                    //$this->log->info("With no repeats.");
+                    //$this->c->logger->info("With no repeats.");
                     if (!in_array($seen[$item], $seen)) {$seen[$item] = array();}
                     if (count($seen[$item]) == $pcache[$item]['count']) {
                         $seen[$item] = array(); // we've already seen all of the presentations
                     }
                     while (in_array($rand, $seen[$item])) {
-                        $this->log->info("We've seen ".$rand.", getting new.");
+                        $this->c->logger->info("We've seen ".$rand.", getting new.");
                         $rand = rand(0, ($pcache[$item]['count'] - 1)); // We've already seen this presentation. get a new $rand
                     }
                     array_push($seen[$item], $rand);
                 }
 
-                //$this->log->info("Rand is ".$rand);
+                //$this->c->logger->info("Rand is ".$rand);
                 // So, this is the place where we get a presentation id to pass back to the main schedule.
-                $this->log->info("Playing random. Pushing " . $pcache[$item]['presentations'][$rand]['id']);
+                $this->c->logger->info("Playing random. Pushing " . $pcache[$item]['presentations'][$rand]['id']);
                 array_push($schedule, ['pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']]);
                 $loops[$item]++;
             } else {
                 // Or we do it here if were just playing in order.
-                $this->log->info("Playing in order. Pushing " . $p['presentations'][$loops[$item]]['id']);
+                $this->c->logger->info("Playing in order. Pushing " . $p['presentations'][$loops[$item]]['id']);
                 array_push($schedule, ['pid' => $pcache[$item]['presentations'][$loops[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loops[$item]]['coid']]);
                 $loops[$item]++;
             }
         };
-        //$this->log->info('$schedule returns '.print_r($schedule, 1));
+        //$this->c->logger->info('$schedule returns '.print_r($schedule, 1));
         return $schedule;
     }
 
     private function getReboot($display) {
         try {
-            $sql = $this->db->prepare("select `reboot` FROM display WHERE `id` = ?");
+            $sql = $this->c->db->prepare("select `reboot` FROM display WHERE `id` = ?");
             $sql->execute(array($display));
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-            $this->log->info("Reboot status: ".$rows[0]['reboot']);
+            $this->c->logger->info("Reboot status: ".$rows[0]['reboot']);
             if ($rows[0]['reboot']) {
                 return 'true';
             } else {
                 return 'false';
             }
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -384,10 +381,10 @@ class Player {
 
     private function updateHeartbeat($version, $display) {
         try {
-            $sql = $this->db->prepare("UPDATE `display` SET `heartbeat`=Now(), `version`= ? WHERE id = ?");
+            $sql = $this->c->db->prepare("UPDATE `display` SET `heartbeat`=Now(), `version`= ? WHERE id = ?");
             $sql->execute(array($version, $display));
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -397,10 +394,10 @@ class Player {
         // If this is the first player run, reset the reboot flag.
         if ($reboot == 'true') {
             try {
-                $sql = $this->db->prepare("UPDATE `display` SET `reboot` = 0 WHERE id =  ?");
+                $sql = $this->c->db->prepare("UPDATE `display` SET `reboot` = 0 WHERE id =  ?");
                 $sql->execute(array($display));
             } catch (PDOException $ex){
-                $this->log->error("Database Error: ".$ex->getMessage());
+                $this->c->logger->error("Database Error: ".$ex->getMessage());
                 return array('stat' => 'error', 'message' =>  $ex->getMessage());
             }
         }
@@ -409,19 +406,19 @@ class Player {
     private function clearOutage($display) {
         // Are we coming back from an outage?
         try {
-            $sql = $this->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
+            $sql = $this->c->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
             $rows = $sql->execute(array($display));
 
             if ($sql->rowCount() > 0) {
-                $sql = $this->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
-                $sql2 = $this->db->prepare("UPDATE `display` SET `outage_id`=0 WHERE id= ?");
+                $sql = $this->c->db->prepare("SELECT `outage_id` FROM `display` WHERE id = ?");
+                $sql2 = $this->c->db->prepare("UPDATE `display` SET `outage_id`=0 WHERE id= ?");
                 foreach ($rows as $row) {
                     $sql->execute(array($display));
                     $sql2->execute(array($display));
                 }
             }
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
@@ -429,7 +426,7 @@ class Player {
 
     private function getUpdate($version) {
         try {
-            $sql = $this->db->query("select `player_version` FROM config");
+            $sql = $this->c->db->query("select `player_version` FROM config");
             $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
             if ($sql->rowCount()) {return false;}
             $curr_version = $rows[0]['player_version'];
@@ -439,14 +436,14 @@ class Player {
                 return false;
             }
         } catch (PDOException $ex){
-            $this->log->error("Database Error: ".$ex->getMessage());
+            $this->c->logger->error("Database Error: ".$ex->getMessage());
             return array('stat' => 'error', 'message' =>  $ex->getMessage());
         }
 
     }
 
     private function randomizeArray ($data) {
-        //$this->log->info("Randomize array data: ".print_r($data, 1));
+        //$this->c->logger->info("Randomize array data: ".print_r($data, 1));
 
         // Step 1: Make an array of the playlist id's with repeats for count.
         $rarray = array();
@@ -457,7 +454,7 @@ class Player {
             }
         }
 
-        //$this->log->info("Weighted Array: ".print_r($rarray, 1));
+        //$this->c->logger->info("Weighted Array: ".print_r($rarray, 1));
 
         // Step 2: Randomize.
         // Try X number of loops with rarr and then just shuffle
@@ -467,13 +464,13 @@ class Player {
             $stat = $this->rarr($rarray);
             $loopCount++;
             if($loopCount == 5) {
-                //$this->log->info("rarr could not get a randomized list, shuffling.");
+                //$this->c->logger->info("rarr could not get a randomized list, shuffling.");
                 shuffle($rarray);
-                //$this->log->info(print_r($rarray, 1));
+                //$this->c->logger->info(print_r($rarray, 1));
                 return $rarray;
             }
         }
-        //$this->log->info("rarr worked. Here's what we got back.\n".print_r($stat, 1));
+        //$this->c->logger->info("rarr worked. Here's what we got back.\n".print_r($stat, 1));
         return $stat;
     }
 
