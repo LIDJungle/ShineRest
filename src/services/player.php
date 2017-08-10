@@ -20,7 +20,6 @@ class Player {
      * Get schedule will get the player schedule for sending to glow
      */
     public function getSchedule($displayId, $version, $mode, $reboot) {
-        //$this->c->logger->info("DisplayId is ".$displayId." Version is ".$version." Mode is ".$mode." reboot is ".$reboot);
         if ($mode === 'false') {
             $this->updateHeartbeat($version, $displayId);
             $this->resetReboot($reboot, $displayId);

@@ -19,7 +19,6 @@ $app->get('/getSchedule', function ($request, $response, $args) {
         $r['message'] = "DisplayId was not specified. Cannot return schedule.";
         return $response->withJson($r, 400);
     }
-    //$this->logger->info("DisplayId is ".$id." Version is ".$version." Mode is ".$mode." reboot is ".$reboot);
 
     $player = $this->get('player');
 
