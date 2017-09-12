@@ -28,7 +28,7 @@ class Player {
         $this->ownerId = $this->getDisplayOwner($displayId);
         $this->dayparts = $this->getDayparts();
         $this->allocations = $this->getAllocations($this->ownerId);
-        $this->createSubcompanyArray($this->allocations);
+        $this->subcompanies = $this->createSubcompanyArray($this->allocations);
 
         /*
          *  Step 1: Create subcompany array needs to return the allocation for multi-display.
@@ -119,19 +119,31 @@ class Player {
 
     private function createSubcompanyArray($allocations) {
         // Get owner allocation
-        $this->subcompanies[] = array(
+        $subcompanies = array();
+        $subcompanies[] = array(
             'coid' => $allocations['coid'],
             'alloc' => round($allocations['owner'] * 2),
             'name' => 'Owner'
         );
         //Get each tenant allocation
         foreach (json_decode($allocations['json']) as $subco) {
-            $this->subcompanies[] = array(
+            $subcompanies[] = array(
                 'coid' => $subco->account,
                 'alloc' => round($subco->allocation * 2),
                 'name' => 'Tenant'
             );
         }
+        // So, here's the rub.... We need to add our multi alloc here
+        // But how do we generate the playlist?
+        $subcompanies[] = array(
+            'coid' => 'MU1',
+            'alloc' => round($allocations('multi') * 2),
+            'name' => 'MultiPane'
+        );
+        /*if ($allocations('multi') > 0) {
+            // TODO: Create a playlist of mutli presentations to draw from.
+        }*/
+        return $subcompanies;
     }
 
     private function generatePresentationCache ($playlists) {
@@ -145,6 +157,7 @@ class Player {
     }
 
     private function getPlaylist($daypart, $subco) {
+        // Default
         $playlist = [
             'id' => '',
             'alloc' => $subco['alloc'],
@@ -152,6 +165,21 @@ class Player {
             'random' => true,
             'repeat' => true
         ];
+        // Multi-Pane only
+        if ($subco['coid'] === 'MU1') {
+            $playlist['id'] = "MU1";
+            $playlist['random'] = '0';
+            $playlist['repeat'] = '0';
+            // TODO: How do we get presentations, and how are they sent to the player?
+            // TODO: How do we make the data format the same so that it passes through the rest of the program and caching?
+
+            // Step 1: Get a list of companies that are window pane only
+            // Need to know ParentId here...
+            // $sql = $this->c->db->prepare("SELECT id FROM `accounts` WHERE  `multi` = 1 AND  `parentId` = 10");
+
+            // Step 2: Get default presentation for each.
+            return $playlist;
+        }
         try {
             $sql = $this->c->db->prepare("SELECT `id`, `name`, `items`, `random`, `repeat` FROM `playlists` WHERE `coid`= ? AND `daypartId` LIKE ?");
             $sql->execute(array($subco['coid'], $daypart['id']));
@@ -280,10 +308,6 @@ class Player {
         /*
          * Better document what's going on in here
          *  So, it seems to me like I could get more mileage out of making this an array of objects.
-         *
-         *
-         *
-         *
          */
 
         $s = array(); // Unrandomized schedule list (playlist id,  allocation)
