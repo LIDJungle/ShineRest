@@ -4,13 +4,6 @@ use \Psr\Http\Message\ResponseInterface as Response;
 
 require '../vendor/autoload.php';
 
-/**
- * Goals
- *  Let's rewrite our Shine API to use proper REST URI's
- *  We're also going to switch over to PDO and get rid of the old mysqli
- *
- */
-
 // Instantiate the app
 $settings = require __DIR__ . '/../src/settings.php';
 $app = new \Slim\App($settings);

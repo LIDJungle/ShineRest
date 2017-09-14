@@ -123,14 +123,24 @@ class Player {
         $subcompanies[] = array(
             'coid' => $allocations['coid'],
             'alloc' => round($allocations['owner'] * 2),
-            'name' => 'Owner'
+            'name' => 'Owner',
+            'type' => 'single'
         );
+        // Create allocation for multi
+        // After this, we "getPlaylists"
+        /*$this->subcompanies[] = array(
+            'coid' => '',
+            'alloc' => round($allocations['multi'] * 2),
+            'name' => 'Window Pane',
+            'type' => 'multi'
+        );*/
         //Get each tenant allocation
         foreach (json_decode($allocations['json']) as $subco) {
             $subcompanies[] = array(
                 'coid' => $subco->account,
                 'alloc' => round($subco->allocation * 2),
-                'name' => 'Tenant'
+                'name' => 'Tenant',
+                'type' => 'single'
             );
         }
         // So, here's the rub.... We need to add our multi alloc here
@@ -174,10 +184,13 @@ class Player {
             // TODO: How do we make the data format the same so that it passes through the rest of the program and caching?
 
             // Step 1: Get a list of companies that are window pane only
-            // Need to know ParentId here...
-            // $sql = $this->c->db->prepare("SELECT id FROM `accounts` WHERE  `multi` = 1 AND  `parentId` = 10");
-
-            // Step 2: Get default presentation for each.
+            // $sql = $this->c->db->prepare("SELECT id FROM `accounts` WHERE  `multi` = 1 AND  `parentId` = '".$this->ownerId."'");
+            // $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            // foreach ($rows as $row) {
+            //      Step 2: Get default presentation for each.
+            // }
+            // How should the playlist object look. Right now it is an array of presentation Id's.
+            //
             return $playlist;
         }
         try {
@@ -209,11 +222,12 @@ class Player {
 
     private function getPresentations($items, $coid) {
         $itemDB = unserialize($items);
-        if (!is_array($itemDB)){return;}
+        if (!is_array($itemDB)){return 0;}
         $presentations = array();
         foreach ($itemDB as $item) {
             $p = $this->getPresentation($item, $coid);
             if ($p) {$presentations[] = $p;}
+            // if ($p) {$presentations[] = {id: $p, coid: $coid, style: '1up'};}
         }
         if (count($presentations) == 0) {
             $this->c->logger->info("No valid presentations found. Getting default presentation for ".$coid);
@@ -239,6 +253,7 @@ class Player {
                         $p = $this->getPresentation($i, $coid);
                         if ($p) {
                             $presentations[] = $p;
+                            // $presentations[] = {id: $p, coid: $coid};
                         }
                     }
                 }
@@ -250,6 +265,10 @@ class Player {
         }
     }
 
+
+    /*
+     *  This gets and caches the JSON for a presentation to be passed with the player object.
+     */
     private function getPresentation($item, $coid) {
         $this->c->logger->info('Getting presentation '.$item->id);
         $presentation = [
@@ -316,12 +335,14 @@ class Player {
 
         /*
          * Here we set up the array of playlists and allocations for our randomizer.
-         * we also set up a cache of playlists and store each one's length.
+         * we also set up a cache of playlists by their ids and store each one's length.
          * Finally, we set up the number of times we've looped over each playlist.
          */
         foreach ($playlists as $p) {
             //$this->c->logger->info("Working on new playlist.".print_r($p, 1));
+            // Get a list of playlist id's and allocations.
             $s[] = array($p['id'], $p['alloc']);
+
             $pcache[$p['id']] = $p;
             $pcache[$p['id']]['count'] = count($p['presentations']);
             $loops[$p['id']] = 0;
