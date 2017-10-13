@@ -128,31 +128,35 @@ class Player {
         );
         // Create allocation for multi
         // After this, we "getPlaylists"
-        /*$this->subcompanies[] = array(
+        $this->subcompanies[] = array(
             'coid' => '',
             'alloc' => round($allocations['multi'] * 2),
             'name' => 'Window Pane',
             'type' => 'multi'
-        );*/
+        );
         //Get each tenant allocation
         foreach (json_decode($allocations['json']) as $subco) {
             $subcompanies[] = array(
                 'coid' => $subco->account,
                 'alloc' => round($subco->allocation * 2),
                 'name' => 'Tenant',
-                'type' => 'single'
+                'type' => 'single',
+                'count' => 1
             );
         }
-        // So, here's the rub.... We need to add our multi alloc here
-        // But how do we generate the playlist?
-        $subcompanies[] = array(
-            'coid' => 'MU1',
-            'alloc' => round($allocations('multi') * 2),
-            'name' => 'MultiPane'
-        );
-        /*if ($allocations('multi') > 0) {
-            // TODO: Create a playlist of mutli presentations to draw from.
-        }*/
+
+        // Multi alloc is added as a playlist.
+        // Normally these are chosen by company id, we will pass through a dummy.
+        if ($allocations('multi') > 0) {
+            $subcompanies[] = array(
+                'coid' => 'MU1',
+                'alloc' => round($allocations('multi') * 2),
+                'name' => 'MultiPane',
+                'type' => '4up',
+                'count' => 4
+                // This is where I need to know multi-count, etc...
+            );
+        }
         return $subcompanies;
     }
 
@@ -180,17 +184,19 @@ class Player {
             $playlist['id'] = "MU1";
             $playlist['random'] = '0';
             $playlist['repeat'] = '0';
-            // TODO: How do we get presentations, and how are they sent to the player?
-            // TODO: How do we make the data format the same so that it passes through the rest of the program and caching?
 
             // Step 1: Get a list of companies that are window pane only
-            // $sql = $this->c->db->prepare("SELECT id FROM `accounts` WHERE  `multi` = 1 AND  `parentId` = '".$this->ownerId."'");
-            // $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
-            // foreach ($rows as $row) {
-            //      Step 2: Get default presentation for each.
-            // }
-            // How should the playlist object look. Right now it is an array of presentation Id's.
-            //
+            $sql = $this->c->db->prepare("SELECT id, defaultPres FROM `accounts` WHERE  `multi` = 1 AND  `parentId` = '".$this->ownerId."'");
+            $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                if ($row['presId'] === '' || $row["id"] === '') {
+                    continue;
+                }
+                $i = new Item();
+                $i->id = $row['defaultPres'];
+                $p = $this->getPresentation($i, $row["id"]);
+                $playlist['presentations'][] = array('companyId' => $row["id"], 'presentation' => $p);
+             }
             return $playlist;
         }
         try {
@@ -226,8 +232,8 @@ class Player {
         $presentations = array();
         foreach ($itemDB as $item) {
             $p = $this->getPresentation($item, $coid);
-            if ($p) {$presentations[] = $p;}
-            // if ($p) {$presentations[] = {id: $p, coid: $coid, style: '1up'};}
+            //if ($p) {$presentations[] = $p;}
+            if ($p) {$presentations[] = array('companyId' => $coid, 'presentation' => $p);}
         }
         if (count($presentations) == 0) {
             $this->c->logger->info("No valid presentations found. Getting default presentation for ".$coid);
@@ -235,6 +241,7 @@ class Player {
         }
         return $presentations;
     }
+
 
     private function getDefaultPresentation($coid) {
         $presentations = array();
@@ -252,8 +259,8 @@ class Player {
                         $i->id = $row['defaultPres'];
                         $p = $this->getPresentation($i, $coid);
                         if ($p) {
-                            $presentations[] = $p;
-                            // $presentations[] = {id: $p, coid: $coid};
+                            //$presentations[] = $p;
+                            $presentations[] = array('companyId' => $coid, 'presentation' => $p);
                         }
                     }
                 }
@@ -341,7 +348,9 @@ class Player {
         foreach ($playlists as $p) {
             //$this->c->logger->info("Working on new playlist.".print_r($p, 1));
             // Get a list of playlist id's and allocations.
-            $s[] = array($p['id'], $p['alloc']);
+
+            // TODO: Need to add presentation count and also return that from Randomizer below.
+            $s[] = array('pid' => $p['id'], 'allocation' => $p['alloc'], 'type' => '4up', 'count' => '4');
 
             $pcache[$p['id']] = $p;
             $pcache[$p['id']]['count'] = count($p['presentations']);
@@ -365,18 +374,39 @@ class Player {
         foreach ($scheduleList as $item) {
             $this->c->logger->info("Current Playlist ".$item." Count: ".$loops[$item]);
             // No presentations? Skip 'em.
-            if ($pcache[$item]['count'] == 0) {continue;}
+            if ($pcache[$item]['count'] == 0 || $s['count'] == 0) {continue;}
 
             // Have we looped as many times as we have presentations? Reset the loop.
             if ($loops[$item] == $pcache[$item]['count']) {$loops[$item] = 0;}
 
+            $count = $s['count'];
+            $presentations = array();
+            while ($count > 0) {
+                $presentations[] = $this->choosePresentation($pcache, $item, $loops, $seen);
+                $count--;
+                $loops[$item]++;
+            }
+
+            $scheduleItem = array(
+                'presentations' => $presentations,
+                'type' => $s['type'],
+                'count' => $s['count']
+            );
+            array_push($schedule, $scheduleItem);
+
+        };
+        //$this->c->logger->info('$schedule returns '.print_r($schedule, 1));
+        return $schedule;
+    }
+
+    private function choosePresentation($pcache, $item, $loop, $seen) {
             // Here's where we randomize the order in which we play the playlist
             if ($pcache[$item]['random']) {
                 //$this->c->logger->info("Randomizing play order");
                 // Choose a number between 0 and the total number of presentations
                 $rand = rand(0, ($pcache[$item]['count'] - 1));
 
-                if ($pcache[$item]['repeat']) {
+                /*if ($pcache[$item]['repeat']) {
                     //$this->c->logger->info("With no repeats.");
                     if (!in_array($seen[$item], $seen)) {$seen[$item] = array();}
                     if (count($seen[$item]) == $pcache[$item]['count']) {
@@ -387,22 +417,17 @@ class Player {
                         $rand = rand(0, ($pcache[$item]['count'] - 1)); // We've already seen this presentation. get a new $rand
                     }
                     array_push($seen[$item], $rand);
-                }
+                }*/
 
                 //$this->c->logger->info("Rand is ".$rand);
                 // So, this is the place where we get a presentation id to pass back to the main schedule.
                 $this->c->logger->info("Playing random. Pushing " . $pcache[$item]['presentations'][$rand]['id']);
-                array_push($schedule, ['pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']]);
-                $loops[$item]++;
+                return array('pid' => $pcache[$item]['presentations'][$rand]['id'], 'coid' => $pcache[$item]['presentations'][$rand]['coid']);
             } else {
                 // Or we do it here if were just playing in order.
-                $this->c->logger->info("Playing in order. Pushing " . $p['presentations'][$loops[$item]]['id']);
-                array_push($schedule, ['pid' => $pcache[$item]['presentations'][$loops[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loops[$item]]['coid']]);
-                $loops[$item]++;
+                $this->c->logger->info("Playing in order. Pushing " . $pcache['presentations'][$loop[$item]]['id']);
+                return  array('pid' => $pcache[$item]['presentations'][$loop[$item]]['id'], 'coid' => $pcache[$item]['presentations'][$loop[$item]]['coid']);
             }
-        };
-        //$this->c->logger->info('$schedule returns '.print_r($schedule, 1));
-        return $schedule;
     }
 
     private function getReboot($display) {
