@@ -365,9 +365,6 @@ class Player {
          */
         foreach ($playlists as $p) {
             //$this->c->logger->info("Working on new playlist.".print_r($p, 1));
-            // Get a list of playlist id's and allocations.
-
-            // TODO: Need to add presentation count and also return that from Randomizer below.
             $s[] = array('pid' => $p['id'], 'allocation' => $p['alloc'], 'type' => $p['type'], 'count' => $p['count'], 'presentationCount' => $p['presentationCount']);
 
             $pcache[(string)$p['id']] = $p;
@@ -375,8 +372,8 @@ class Player {
             $loops[(string)$p['id']] = 0;
         }
         // Presentation cache is good.
-        $this->c->logger->info("\n\nPassed presentation cache.\n\nMulti pcache is: ".print_r($pcache['MU1'], 1));
-        $this->c->logger->info("\n\nPassed presentation cache.\n\n123 pcache is: ".print_r($pcache['123'], 1));
+        //$this->c->logger->info("\n\nPassed presentation cache.\n\nMulti pcache is: ".print_r($pcache['MU1'], 1));
+        //$this->c->logger->info("\n\nPassed presentation cache.\n\n123 pcache is: ".print_r($pcache['123'], 1));
         /*
          * Our final schedule list comes back randomized.
          * It's an array of playlist Id's and allocations.
@@ -410,7 +407,7 @@ class Player {
                 if ($loops[(string)$item['pid']] == count($pcache[(string)$item['pid']]['presentations'])) {
                     $loops[(string)$item['pid']] = 0;
                 }
-                $this->c->logger->info('Choosing presentation. Count is: '.$count);
+                //$this->c->logger->info('Choosing presentation. Count is: '.$count);
                 // while($this->choosePresentation($pcache, $item['pid'], $loops) !== $seen){}
                 $presentations[] = $this->choosePresentation($pcache, $item['pid'], $loops);
                 $loops[(string)$item['pid']]++;
@@ -432,12 +429,12 @@ class Player {
     // OK, so the remainder of our bug lies here.... But also the best place to improve our code flow.
     private function choosePresentation($pcache, $item, $loop) {
             // Here's where we randomize the order in which we play the playlist
-            $this->c->logger->info('In ChoosePresentation. Item is '.$item);
+            //$this->c->logger->info('In ChoosePresentation. Item is '.$item);
             if ($pcache[$item]['random']) {
                 $this->c->logger->info("Randomizing play order");
                 // Choose a number between 0 and the total number of presentations
                 $rand = rand(0, ($pcache[(string)$item]['count'] - 1));
-                $this->c->logger->info("Rand is ".$rand." Count is ".$pcache[(string)$item]['count']);
+                //$this->c->logger->info("Rand is ".$rand." Count is ".$pcache[(string)$item]['count']);
 
                 /*if ($pcache[$item]['repeat']) {
                     //$this->c->logger->info("With no repeats.");
@@ -457,11 +454,11 @@ class Player {
                  */
 
                 // So, this is the place where we get a presentation id to pass back to the main schedule.
-                $this->c->logger->info("Playing random. Pushing " . $pcache[(string)$item]['presentations'][$rand]['presentation']['id']." coid: ".$pcache[(string)$item]['presentations'][$rand]['presentation']['coid']);
+                //$this->c->logger->info("Playing random. Pushing " . $pcache[(string)$item]['presentations'][$rand]['presentation']['id']." coid: ".$pcache[(string)$item]['presentations'][$rand]['presentation']['coid']);
                 return array('pid' => $pcache[(string)$item]['presentations'][$rand]['presentation']['id'], 'coid' => $pcache[(string)$item]['presentations'][$rand]['presentation']['coid']);
             } else {
                 // Or we do it here if were just playing in order.
-                $this->c->logger->info("Playing in order. Pushing " . $pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['id'] . " coid: " .$pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['coid']);
+                //$this->c->logger->info("Playing in order. Pushing " . $pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['id'] . " coid: " .$pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['coid']);
                 return  array('pid' => $pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['id'], 'coid' => $pcache[(string)$item]['presentations'][$loop[(string)$item]]['presentation']['coid']);
             }
     }
@@ -547,8 +544,6 @@ class Player {
 
     }
 
-
-    // TODO: Need to update this to work with new object
     private function randomizeArray ($data) {
         //$this->c->logger->info("Randomize array data: ".print_r($data, 1));
 
