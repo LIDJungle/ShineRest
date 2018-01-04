@@ -32,13 +32,9 @@ class Player {
         }
         $this->display = $this->getDisplay($displayId);
         $this->ownerId = $this->display['ownerId'];
-        $this->c->logger->info("OwnerId: ".$this->ownerId);
-        $this->c->logger->info("MultiStyle: ".print_r($this->display['multiStyle'], 1));
-        //$this->ownerId = $this->getDisplayOwner($displayId);
         $this->dayparts = $this->getDayparts();
         $this->allocations = $this->getAllocations($this->ownerId);
         $this->subcompanies = $this->createSubcompanyArray($this->allocations);
-        $this->c->logger->info("Subcompany array: ".print_r($this->subcompanies, 1));
 
         /*
          *  Step 1: Create subcompany array needs to return the allocation for multi-display.
@@ -173,10 +169,6 @@ class Player {
             $this->c->logger->info("MultiStyle is not empty");
             $counts = ['4up' => 4, '9up' => 9, '16up' => 16];
             foreach(json_decode($this->display['multiStyle']) as $loop => $m) {
-                $this->c->logger->info("loop is: ".print_r($loop, 1));
-                $this->c->logger->info("m is: ".print_r($m, 1));
-                $this->c->logger->info("Multi alloc is ".$multi[$loop]);
-                $this->c->logger->info("Type is: ".$m->type);
                 $subcompanies[] = array(
                     'coid' => 'MU'.$loop,
                     'alloc' => round(($multi[$loop] / $counts[$m->type]) * 2),
@@ -186,7 +178,6 @@ class Player {
                 );
             }
         }
-        $this->c->logger->info("Passed multi alloc");
 
         // After this, we "getPlaylists"
         return $subcompanies;
@@ -310,7 +301,6 @@ class Player {
                         $i->id = $row['defaultPres'];
                         $p = $this->getPresentation($i, $coid);
                         if ($p) {
-                            //$presentations[] = $p;
                             $presentations[] = array('companyId' => $coid, 'presentation' => $p);
                         }
                     }
