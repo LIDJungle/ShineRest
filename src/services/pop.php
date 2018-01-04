@@ -12,8 +12,10 @@ class POP
     }
 
     public function storePop($displayId, $popData) {
+        $count = 0;
+        $this->c->logger->info("Posted POP data: ".print_r($popData, 1));
         foreach ($popData as $popentry) {
-            $this->c->logger->info("Working on new POP entry ".print_r($popentry, 1));
+            $this->c->logger->info($count.": Working on new POP entry ".print_r($popentry, 1));
             $time = date( 'Y-m-d H:i:s', $popentry['time'] );
             try {
                 $sql = $this->c->db->prepare("SELECT * FROM `pop` WHERE `displayId` = ? AND `time` = ? AND `presId` = ?");
@@ -23,13 +25,15 @@ class POP
                 return 'error';
             }
 
+            $count++;
+
             if ($sql->rowCount() < 1) {
                 try {
                     $sql2 = $this->c->db->prepare(
                         "INSERT INTO `pop` (`displayId`, `time`, `duration`, `presId`, `version`, `coid`, `count`) VALUES (:displayId, :time, :duration, :presId, :version, :coid, :count)"
                     );
                     $sql2->execute(array(
-                        ':displayId' => $popentry['displayId'],
+                        ':displayId' => $displayId,
                         ':time' => $time,
                         ':duration' => $popentry['duration'],
                         ':presId' => $popentry['presId'],

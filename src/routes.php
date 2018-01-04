@@ -6,6 +6,7 @@
  */
 
 /** Heartbeat
+ * http://shineemc.com/api/public/index.php/getSchedule?displayId=100002&version=1.0&reboot=false&previewMode=true
  * public/getSchedule?displayId=100002&version=1.0&reboot=false&previewMode=true
  *  Required: displayId
  */
@@ -63,30 +64,30 @@ $app->get('/getDisplay', function ($request, $response, $args) {
  *  displayId
  *  pop - an array of proof of play data.
  */
-$app->post('/storePop', function ($request, $response, $args) {
-    $id = $request->getParam('displayId');
-    $data = $request->getParam('pop');
-    if ($id === null) {
-        $r['stat'] = 'error';
-        $r['message'] = "DisplayId was not specified. Cannot store Proof of Play data.";
-        return $response->withJson($r, 400);
-    }
-    if ($data === null) {
-        $r['stat'] = 'error';
-        $r['message'] = "No data sent to server. Nothing to store.";
-        return $response->withJson($r, 400);
-    }
+    $app->post('/storePop', function ($request, $response, $args) {
+        $id = $request->getParam('displayId');
+        $data = $request->getParam('pop');
+        if ($id === null) {
+            $r['stat'] = 'error';
+            $r['message'] = "DisplayId was not specified. Cannot store Proof of Play data.";
+            return $response->withJson($r, 400);
+        }
+        if ($data === null) {
+            $r['stat'] = 'error';
+            $r['message'] = "No data sent to server. Nothing to store.";
+            return $response->withJson($r, 400);
+        }
 
-    $pop = $this->get('pop');
+        $pop = $this->get('pop');
 
-    $stat = $pop->storePop($id, $data);
-    if ($stat['stat'] === 'error') {
-        $newResponse = $response->withJson($stat, 500);
-    } else {
-        $newResponse = $response->withJson($stat, 200);
-    }
-    return $newResponse;
-});
+        $stat = $pop->storePop($id, $data);
+        if ($stat['stat'] === 'error') {
+            $newResponse = $response->withJson($stat, 500);
+        } else {
+            $newResponse = $response->withJson($stat, 200);
+        }
+        return $newResponse;
+    });
 
 $app->get('/loadPresentation', function ($request, $response, $args) {
     $id = $request->getParam('id');
